@@ -72,9 +72,20 @@ def build(death: date, out: str) -> list[str]:
         f.write(f"Generated for date of death {death.isoformat()}.\n\n")
         f.write("Files: 00-task-checklist.csv (dated), 01-expenses.csv (claim reimbursement from the estate), "
                 "02-assets.csv (date-of-death inventory), 03-distributions.csv.\n\n")
+        f.write("One-time purchase, no subscription, nothing to cancel. Plain CSV: opens in Excel, Numbers, "
+                "Google Sheets or LibreOffice and stays yours offline.\n\n")
         f.write(f"DISCLAIMER: {DISCLAIMER}\n")
     written.append(p)
     return written
+
+
+def bundle(files: list[str], zip_path: str) -> str:
+    """Pack the generated kit into one zip — the file a buyer downloads after checkout."""
+    import zipfile
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in files:
+            z.write(p, arcname=os.path.join("alberta-executor-kit", os.path.basename(p)))
+    return zip_path
 
 
 def _selftest():
@@ -85,8 +96,13 @@ def _selftest():
         rows = list(csv.reader(open(os.path.join(d, "00-task-checklist.csv"))))
         assert rows[0][0] == "target_date" and len(rows) == len(TASKS) + 1
         assert rows[1][0] == "2026-01-15" and rows[-1][0] == "2026-12-11"
-        assert "not legal advice" in open(os.path.join(d, "README.md")).read()
-    print("selftest ok: 5 files, %d tasks, dates sorted" % len(TASKS))
+        readme = open(os.path.join(d, "README.md")).read()
+        assert "not legal advice" in readme and "no subscription" in readme
+        import zipfile
+        zp = bundle(files, os.path.join(d, "kit.zip"))
+        names = zipfile.ZipFile(zp).namelist()
+        assert len(names) == 5 and all(n.startswith("alberta-executor-kit/") for n in names), names
+    print("selftest ok: 5 files, %d tasks, dates sorted, zip bundle 5 entries" % len(TASKS))
 
 
 if __name__ == "__main__":
@@ -94,5 +110,8 @@ if __name__ == "__main__":
         _selftest()
     else:
         death = date.fromisoformat(sys.argv[1]) if len(sys.argv) > 1 else date.today()
-        for p in build(death, os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist", "alberta-executor-kit")):
+        dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
+        files = build(death, os.path.join(dist, "alberta-executor-kit"))
+        for p in files:
             print(p)
+        print(bundle(files, os.path.join(dist, "alberta-executor-kit.zip")))
